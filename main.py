@@ -28,7 +28,7 @@ async def ping(ctx):
 
 # คำสั่ง AI: !ถาม <คำถาม>
 @bot.command()
-async def AI(ctx, *, message):
+async def ai(ctx, *, message):
     await ctx.send("🤖 กำลังคิด...")
     try:
         response = openai.ChatCompletion.create(
