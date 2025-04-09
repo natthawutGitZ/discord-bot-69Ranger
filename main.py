@@ -26,23 +26,28 @@ async def on_ready():
 async def ping(ctx):
     await ctx.send(' กำลังทำงาน [ปกติ ]')
 
-# คำสั่ง AI: !ถาม <คำถาม>
-@bot.command()
-async def ถาม(ctx, *, message):
-    await ctx.send("🤖 กำลังคิด...")
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # หรือ gpt-4 ถ้าคุณมีสิทธิ์
-            messages=[
-                {"role": "system", "content": "คุณคือผู้ช่วย AI ภาษาไทยที่สุภาพและให้ข้อมูลอย่างชัดเจน"},
-                {"role": "user", "content": message}
-            ]
-        )
-        reply = response['choices'][0]['message']['content']
-        await ctx.send(reply)
-    except Exception as e:
-        await ctx.send(f"❌ เกิดข้อผิดพลาด: {e}")
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
 
+    if message.content.startswith("ถาม "):
+        question = message.content[4:]
+        await message.channel.send("🤖 กำลังคิด...")
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "คุณคือผู้ช่วย AI ภาษาไทยที่สุภาพและให้ข้อมูลอย่างชัดเจน"},
+                    {"role": "user", "content": question}
+                ]
+            )
+            reply = response['choices'][0]['message']['content']
+            await message.channel.send(reply)
+        except Exception as e:
+            await message.channel.send(f"❌ เกิดข้อผิดพลาด: {e}")
+
+    await bot.process_commands(message)  # สำคัญมาก ถ้ายังใช้ @bot.command ร่วมด้วย
 # รันเว็บกันบอทหลับ (Replit)
 keep_alive()
 
