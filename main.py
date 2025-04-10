@@ -1,14 +1,15 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import os
-from openai import OpenAI  # ใช้รูปแบบใหม่
+from openai import OpenAI
 from keep_alive import keep_alive
 
 # ตั้งค่า intents
 intents = discord.Intents.default()
 intents.message_content = True
 
-# สร้าง client ของ OpenAI แบบใหม่
+# OpenAI Client
 openai_client = OpenAI()
 
 # สร้างบอท
@@ -17,16 +18,22 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # เมื่อบอทพร้อมใช้งาน
 @bot.event
 async def on_ready():
+    await bot.tree.sync()  # ✅ Sync Slash Commands
     print(f'✅ Logged in as {bot.user}')
     activity = discord.Game(name="Arma 3 | 69RangerGTMCommunit")
     await bot.change_presence(status=discord.Status.online, activity=activity)
 
-# คำสั่งตัวอย่าง: !ping
+# !ping (ปกติ)
 @bot.command()
 async def ping(ctx):
     await ctx.send('กำลังทำงาน [ปกติ]')
 
-# รองรับข้อความ "ถาม ..." โดยไม่ต้องใช้ prefix
+# ✅ /ping (Slash Command)
+@bot.tree.command(name="ping", description="ทดสอบสถานะของบอท")
+async def slash_ping(interaction: discord.Interaction):
+    await interaction.response.send_message("บอทยังทำงานอยู่ 🟢")
+
+# รองรับข้อความ "ถาม ..."
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -50,7 +57,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ป้องกันบอทหลับ (Replit/Render)
+# ป้องกันบอทหลับ
 keep_alive()
 
 # รันบอท
