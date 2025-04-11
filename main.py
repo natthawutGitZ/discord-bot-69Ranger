@@ -180,7 +180,8 @@ class ConfirmEventView(discord.ui.View):
     @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            await interaction.response.send_message("❌ เฉพาะผู้สร้างเท่านั้นที่สามารถยกเลิกได้", ephemeral=True
+            await interaction.response.send_message("❌ เฉพาะผู้สร้างเท่านั้นที่สามารถยกเลิกได้", ephemeral=True)
+
             return
         await interaction.response.edit_message(content="🚫 ยกเลิกการสร้างกิจกรรมแล้ว", embed=None, view=None)
 
