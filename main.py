@@ -1,109 +1,67 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
+import datetime
+import pytz
 import os
 from keep_alive import keep_alive
 import asyncio
-from datetime import datetime, timedelta
-import pytz
 
 # ตั้งค่า intents
 intents = discord.Intents.default()
 intents.message_content = True
+INTENTS = discord.Intents.all()
 intents.members = True
+
+# เก็บข้อมูล event ชั่วคราวในหน่วยความจำ
+event_data = {}  
 
 # สร้างบอท
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# ข้อมูลอีเวนต์ทั้งหมด
-event_data = {}
 
-# Timezone ของไทย
-THAI_TZ = pytz.timezone("Asia/Bangkok")
+@bot.command()
+async def สร้างอีเว้น(ctx, *, รายละเอียด=None):
+    title = "Operation: NAME "
+    description = "Description Story"
+    time_str = "30 มีนาคม 2568 21:00"
+    
+    # ใช้เวลาจริง (แก้ตรงนี้ให้รองรับ input ได้ในอนาคต)
+    event_time = datetime.datetime(2025, 3, 30, 21, 0, tzinfo=pytz.timezone("Asia/Bangkok"))
 
-# คลาสสำหรับการเลือกห้อง
-class ChannelSelect(discord.ui.ChannelSelect):
-    def __init__(self, event_data):
-        super().__init__(
-            placeholder='เลือกห้องที่ต้องการโพสต์กิจกรรม',
-            min_values=1,
-            max_values=1,
-            channel_types=[discord.ChannelType.text]
-        )
-        self.event_data = event_data
+    embed = discord.Embed(title=title, description=description, color=0x3399ff)
+    embed.add_field(name="🕒 เวลา", value=f"{time_str} (เวลาไทย)", inline=False)
+    embed.add_field(name="✅ เข้าร่วม", value="ยังไม่มี", inline=True)
+    embed.add_field(name="❌ ไม่เข้าร่วม", value="ยังไม่มี", inline=True)
+    embed.add_field(name="❔ อาจจะเข้าร่วม", value="ยังไม่มี", inline=True)
+    embed.set_footer(text=f"Created by {ctx.author.display_name}")
 
-class ConfirmEventView(discord.ui.View):
-    def __init__(self, title, description, event_time, image_url, interaction):
-        super().__init__(timeout=None)
+    # สร้างปุ่ม
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="✅", custom_id="accept", style=discord.ButtonStyle.success))
+    view.add_item(discord.ui.Button(label="❌", custom_id="decline", style=discord.ButtonStyle.danger))
+    view.add_item(discord.ui.Button(label="❔", custom_id="tentative", style=discord.ButtonStyle.primary))
+    view.add_item(discord.ui.Button(label="📝 Edit", custom_id="edit", style=discord.ButtonStyle.secondary))
+    view.add_item(discord.ui.Button(label="🗑 Delete", custom_id="delete", style=discord.ButtonStyle.danger))
 
-        self.user = interaction.user
-        self.title = title
-        self.description = description
-        self.event_time = event_time
-        self.image_url = image_url
+    msg = await ctx.send(embed=embed, view=view)
 
-        event_data_temp = {
-            "title": title,
-            "description": description,
-            "event_time": event_time,
-            "image_url": image_url
+    # สร้าง Thread สำหรับ event นี้
+    thread = await msg.create_thread(name=title)
+
+    # เก็บข้อมูล
+    event_data[msg.id] = {
+        "owner": ctx.author.id,
+        "time": event_time,
+        "thread_id": thread.id,
+        "responses": {
+            "accept": [],
+            "decline": [],
+            "tentative": []
         }
-
-        self.channel_select = ChannelSelect(event_data_temp)
-        self.add_item(self.channel_select)
-
-    @discord.ui.button(label="ยืนยัน", style=discord.ButtonStyle.green)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user != self.user:
-            await interaction.response.send_message("คุณไม่สามารถยืนยันกิจกรรมนี้ได้", ephemeral=True)
-            return
-
-        selected_channel_id = self.channel_select.values[0]
-        selected_channel = interaction.guild.get_channel(int(selected_channel_id))
-
-        embed = discord.Embed(
-            title=self.title,
-            description=self.description,
-            color=discord.Color.green()
-        )
-        embed.add_field(name="🕒 วันและเวลา", value=self.event_time.strftime("%d/%m/%Y %H:%M"))
-        if self.image_url:
-            embed.set_image(url=self.image_url)
-
-        await selected_channel.send(embed=embed)
-        await interaction.response.send_message("กิจกรรมถูกโพสต์เรียบร้อยแล้ว", ephemeral=True)
-        self.stop()
-
-    @discord.ui.button(label="ยกเลิก", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user != self.user:
-            await interaction.response.send_message("คุณไม่สามารถยกเลิกกิจกรรมนี้ได้", ephemeral=True)
-            return
-
-        await interaction.response.send_message("การสร้างกิจกรรมถูกยกเลิก", ephemeral=True)
-        self.stop()
-
-@bot.tree.command(name="event", description="สร้างอีเวนต์ใหม่")
-@app_commands.describe(title="หัวข้อ", description="รายละเอียด", time="เวลา (เช่น 11-04-2025 18:30)", image_url="ลิงก์รูปภาพ (ไม่บังคับ)")
-async def create_event(interaction: discord.Interaction, title: str, description: str, time: str, image_url: str = None):
-    try:
-        event_time = datetime.strptime(time, "%d-%m-%Y %H:%M")
-        event_time = THAI_TZ.localize(event_time).astimezone(pytz.utc)  # แปลงเป็น UTC
-    except ValueError:
-        await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง! ใช้รูปแบบ: DD-MM-YYYY HH:MM", ephemeral=True)
-        return
-
-    embed = discord.Embed(title="🔍 ตรวจสอบกิจกรรมก่อนสร้าง", description=description, color=discord.Color.teal())
-    embed.add_field(name="📌 หัวข้อ", value=title, inline=False)
-    embed.add_field(name="🕒 เวลา", value=f"{event_time.astimezone(THAI_TZ).strftime('%d-%m-%Y %H:%M')} น.", inline=False)
-    if image_url:
-        embed.set_image(url=image_url)
-
-    view = ConfirmEventView(title, description, event_time, image_url, interaction)
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    }
 
 
-# ==== ระบบหลักอื่น ๆ ====
 
 # ✅ แสดงสถานะ Arma 3 | 69RangerGTMCommunit | ✅ แสดงคำสั่ง Slash บนหน้า Bot Profile
 @bot.event
@@ -122,34 +80,61 @@ async def on_ready():
         print(f"❌ Sync failed: {e}")
     for cmd in bot.tree.get_commands():
         print(f"📌 Synced command: /{cmd.name}")
+        
+    async def on_interaction(interaction: discord.Interaction):
+    if not interaction.type == discord.InteractionType.component:
+        return
 
-# ✅ ปุ่มยืนยันก่อนส่งข้อความ
-class ConfirmView(discord.ui.View):
-    def __init__(self, role, message, members):
-        super().__init__(timeout=60)
-        self.role = role
-        self.message = message
-        self.members = members
+    msg_id = interaction.message.id
+    user = interaction.user
+    cid = interaction.data["custom_id"]
 
-    @discord.ui.button(label="✅ ยืนยัน", style=discord.ButtonStyle.green)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="📤 เริ่มส่งข้อความ...", view=None)
+    if msg_id not in event_data:
+        return
 
-        success = 0
-        failed = 0
-        for member in self.members:
-            try:
-                await member.send(self.message)
-                success += 1
-            except:
-                failed += 1
-            await asyncio.sleep(1)
+    data = event_data[msg_id]
 
-        await interaction.followup.send(f"✅ ส่งสำเร็จ: {success} คน\n❌ ส่งไม่สำเร็จ: {failed} คน", ephemeral=True)
+    if cid == "delete":
+        if user.id == data["owner"]:
+            await interaction.message.delete()
+            del event_data[msg_id]
+        else:
+            await interaction.response.send_message("คุณไม่สามารถลบ event นี้ได้", ephemeral=True)
+        return
 
-    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="🚫 ยกเลิกการส่งข้อความ", view=None)
+    if cid in ["accept", "decline", "tentative"]:
+        # เคลียร์ชื่อจากทุกกลุ่มก่อน
+        for key in data["responses"]:
+            if user.display_name in data["responses"][key]:
+                data["responses"][key].remove(user.display_name)
+        data["responses"][cid].append(user.display_name)
+
+        # อัปเดต Embed
+        embed = interaction.message.embeds[0]
+        embed.set_field_at(1, name="✅ เข้าร่วม", value="\n".join(data["responses"]["accept"]) or "ยังไม่มี", inline=True)
+        embed.set_field_at(2, name="❌ ไม่เข้าร่วม", value="\n".join(data["responses"]["decline"]) or "ยังไม่มี", inline=True)
+        embed.set_field_at(3, name="❔ อาจจะเข้าร่วม", value="\n".join(data["responses"]["tentative"]) or "ยังไม่มี", inline=True)
+
+        await interaction.response.edit_message(embed=embed)
+
+@tasks.loop(minutes=1)
+async def check_event():
+    now = datetime.datetime.now(pytz.timezone("Asia/Bangkok"))
+    for msg_id in list(event_data.keys()):
+        data = event_data[msg_id]
+        seconds_left = (data["time"] - now).total_seconds()
+
+        if 0 <= seconds_left <= 600:
+            thread = bot.get_channel(data["thread_id"])
+            if thread:
+                await thread.send(
+                    f"🔔 เตือนความจำ: อีก 10 นาทีจะเริ่มกิจกรรม!\n"
+                    f"ผู้เข้าร่วม ({len(data['responses']['accept'])} คน):\n"
+                    + "\n".join(data["responses"]["accept"])
+                )
+            del event_data[msg_id]
+
+
 
 
 # ✅ Help แสดงคำสั่งทั้งหมดของบอท
@@ -193,22 +178,54 @@ async def dm(interaction: discord.Interaction, role: discord.Role, message: str)
         view=view,
         ephemeral=True
     )
+    
+# ✅ ปุ่มยืนยันก่อนส่งข้อความ
+class ConfirmView(discord.ui.View):
+    def __init__(self, role, message, members):
+        super().__init__(timeout=60)
+        self.role = role
+        self.message = message
+        self.members = members
+
+    @discord.ui.button(label="✅ ยืนยัน", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="📤 เริ่มส่งข้อความ...", view=None)
+
+        success = 0
+        failed = 0
+        for member in self.members:
+            try:
+                await member.send(self.message)
+                success += 1
+            except:
+                failed += 1
+            await asyncio.sleep(1)
+
+        await interaction.followup.send(f"✅ ส่งสำเร็จ: {success} คน\n❌ ส่งไม่สำเร็จ: {failed} คน", ephemeral=True)
+
+    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="🚫 ยกเลิกการส่งข้อความ", view=None)
 
 # ✅ Auto Role ให้กับสมาชิกใหม่
-# ✅ ต้อนรับสมาชิกใหม่
 @bot.event
 async def on_member_join(member):
     try:
-        # ให้ Role
+        # 👇 ใส่ชื่อ Role ที่ต้องการให้สมาชิกใหม่ได้รับ
         role_name = "Civilian"
-        role = discord.utils.get(member.guild.roles, name=role_name)
+        guild = member.guild
+        role = discord.utils.get(guild.roles, name=role_name)
+        
         if role:
             await member.add_roles(role)
             print(f"✅ ให้ Role '{role.name}' กับ {member.name} แล้ว")
         else:
-            print(f"❌ ไม่พบ Role '{role_name}'")
+            print(f"❌ ไม่พบ Role ชื่อ '{role_name}'")
 
-        # ส่งข้อความต้อนรับ
+# ✅ ต้อนรับสมาชิกใหม่
+@bot.event
+async def on_member_join(member):
+    try:
         welcome_message = """สวัสดี! ยินดีต้อนรับสู่เซิร์ฟเวอร์ของเรา!
 เราหวังว่าคุณจะมีความสนุกสนานและมีส่วนร่วมกับทุกคนที่นี่ :)
 ถ้าคุณมีคำถามหรือปัญหา สอบถามได้ที่ <#1281566308097462335>
@@ -221,9 +238,14 @@ async def on_member_join(member):
 
 
 
+
 # ✅ ป้องกันบอทหลับ
 keep_alive()
 
 # ✅ เริ่มรันบอท
 TOKEN = os.getenv("DISCORD_TOKEN")
 bot.run(TOKEN)
+
+
+
+
