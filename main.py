@@ -5,6 +5,8 @@ import os
 from keep_alive import keep_alive
 import asyncio
 from datetime import datetime, timedelta
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 
 # Initialize bot and intents
@@ -155,7 +157,10 @@ class EventJoinView(discord.ui.View):
     @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.success, row=0)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         print("📌 Callback ถูกเรียกใช้งาน")
-        await self.handle_response(interaction, "going", button)
+        try:
+            await interaction.response.send_message("📌 คุณตอบว่า: ✅ เข้าร่วม", ephemeral=True)
+        except Exception as e:
+            print(f"❌ เกิดข้อผิดพลาดใน Callback: {e}")
 
     @discord.ui.button(label="❔ อาจจะมา", style=discord.ButtonStyle.primary, row=0)
     async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
