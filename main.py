@@ -17,13 +17,22 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # ตั้งค่า OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# ✅ แสดงสถานะ Arma 3 | 69RangerGTMCommunit
+# ✅ แสดงสถานะ Arma 3 | 69RangerGTMCommunit | ✅ แสดงคำสั่ง Slash บนหน้า Bot Profile
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print(f'✅ Logged in as {bot.user}')
+    
+    # เปลี่ยนสถานะเป็น Arma 3 | 69RangerGTMCommunit
     activity = discord.Game(name="Arma 3 | 69RangerGTMCommunit")
     await bot.change_presence(status=discord.Status.online, activity=activity)
+
+    try:
+        synced = await bot.tree.sync()  # Global Sync
+        print(f"✅ Synced {len(synced)} global command(s).")
+    except Exception as e:
+        print(f"❌ Sync failed: {e}")
+
 
 # ✅ ปุ่มยืนยันก่อนส่งข้อความ
 class ConfirmView(discord.ui.View):
@@ -133,14 +142,8 @@ async def on_member_join(member):
     except discord.Forbidden:
         print(f"❌ ไม่สามารถส่งข้อความให้ {member.name} ได้")
 
-# ✅ แสดงคำสั่ง Slash บนหน้า Bot Profile
-@bot.event
-async def on_ready():
-    try:
-        synced = await bot.tree.sync()  # <-- Global Sync
-        print(f"✅ Synced {len(synced)} global command(s).")
-    except Exception as e:
-        print(f"❌ Sync failed: {e}")
+
+
 
 
 # ✅ ป้องกันบอทหลับ
