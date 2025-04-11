@@ -27,24 +27,15 @@ event_data = {}
 THAI_TZ = pytz.timezone("Asia/Bangkok")
 
 # คลาสสำหรับการเลือกห้อง
-class ChannelSelect(discord.ui.Select):
-    def __init__(self, interaction):
-        options = [
-            discord.SelectOption(label=channel.name, value=str(channel.id))
-            for channel in interaction.guild.text_channels
-        ]
-        super().__init__(placeholder="เลือกช่องสำหรับอีเวนต์", min_values=1, max_values=1, options=options)
-
-
-        super().__init__(placeholder="เลือกห้องที่ต้องการโพสต์กิจกรรม", min_values=1, max_values=1, options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        # กำหนดให้กิจกรรมจะโพสต์ในช่องที่เลือก
-        selected_channel = interaction.guild.get_channel(int(self.values[0]))
-        await selected_channel.send(f"**กิจกรรมใหม่**: {self.event_data['title']}")
-
-        # ส่งข้อความตอบกลับ
-        await interaction.response.send_message(f"กิจกรรมจะถูกโพสต์ในช่อง: {selected_channel.mention}", ephemeral=True)
+class ChannelSelect(discord.ui.ChannelSelect):
+    def __init__(self, event_data):
+        super().__init__(
+            placeholder='เลือกห้องที่ต้องการโพสต์กิจกรรม',
+            min_values=1,
+            max_values=1,
+            channel_types=[discord.ChannelType.text]
+        )
+        self.event_data = event_data  # <<== เพิ่มบรรทัดนี้
 
 
 class EventView(discord.ui.View):
@@ -141,13 +132,13 @@ def generate_event_embed(event_id):
 class ConfirmEventView(discord.ui.View):
     def __init__(self, title, description, event_time, image_url, interaction):
         super().__init__(timeout=None)
-        self.title = title
-        self.description = description
-        self.event_time = event_time
-        self.image_url = image_url
-        self.user = interaction
-        self.channel_select = ChannelSelect(interaction)
-        self.add_item(self.channel_select)
+      event_data = {
+        "title": title,
+        "description": description,
+        "event_time": event_time,
+        "image_url": image_url
+}
+self.add_item(ChannelSelect(event_data))
 
     @discord.ui.button(label="✅ ยืนยันสร้างกิจกรรม", style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
