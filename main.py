@@ -81,7 +81,7 @@ async def on_ready():
     for cmd in bot.tree.get_commands():
         print(f"📌 Synced command: /{cmd.name}")
         
-    async def on_interaction(interaction: discord.Interaction):
+   
     if not interaction.type == discord.InteractionType.component:
         return
 
