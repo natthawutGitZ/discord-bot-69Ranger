@@ -153,6 +153,7 @@ class EventJoinView(discord.ui.View):
     # Buttons for event responses
     @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print("📌 Callback ถูกเรียกใช้งาน")
         await self.handle_response(interaction, "going", button)
 
     @discord.ui.button(label="❔ อาจจะมา", style=discord.ButtonStyle.primary)
@@ -203,11 +204,11 @@ class EventJoinView(discord.ui.View):
     title="หัวข้ออีเวนต์",
     editor_info="Editor by / PresetMod",
     story="เนื้อเรื่องของภารกิจ",
-    roles="บทบาทที่รับ (เช่น Rifleman, Sniper)",
-    start_time="เวลาเริ่มต้น (เช่น 30-03-2568 21:00)",
-    end_time="เวลาสิ้นสุด (เช่น 30-03-2568 23:59)",
+    roles="บทบาทที่รับ (75ranger)",
+    start_time="เวลาเริ่มต้น (เช่น 30-03-2025 21:00)",
+    end_time="เวลาสิ้นสุด (เช่น 30-03-2025 23:59)",
     channel="ห้องที่ต้องการโพสต์อีเวนต์",
-    image_url="ลิงก์รูปภาพ (ไม่บังคับ)"
+    image_url="ลิงก์รูปภาพ URL (ไม่บังคับ)"
 )
 async def create_event(
     interaction: discord.Interaction,
@@ -231,10 +232,10 @@ async def create_event(
         formatted_time = format_event_time(start_time_utc, end_time_utc, THAI_TZ)
 
         # สร้าง Embed
-        embed = discord.Embed(title=title, color=discord.Color.green())
-        embed.add_field(name="🛠️ Editor / Preset / Mod", value=editor_info, inline=False)
+        embed = discord.Embed(title=title.upper(), color=discord.Color.green())  # ใช้ .upper() เพื่อแปลง title เป็นตัวใหญ่
+        embed.add_field(name="🛠️ Editor | PresetMod", value=editor_info, inline=False)
         embed.add_field(name="📖 Story", value=story, inline=False)
-        embed.add_field(name="🎭 Roles", value=roles, inline=False)
+        embed.add_field(name="⭐ Roles", value=roles, inline=False)
         embed.add_field(name="🕒 วันและเวลา", value=formatted_time, inline=False)
         embed.add_field(name="📋 การเข้าร่วม", value="✅ เข้าร่วม: 0\n❔ อาจจะมา: 0\n❌ ไม่มา: 0", inline=False)
 
@@ -244,8 +245,8 @@ async def create_event(
         view = EventJoinView(title, start_time_utc, interaction.user.id)
         msg = await channel.send(embed=embed, view=view)
 
-        thread = await msg.create_thread(name=f"🗓️ {title}", auto_archive_duration=60)
-        await thread.send(f"📢 กิจกรรม `{title}` ถูกสร้างโดย <@{interaction.user.id}>")
+        thread = await msg.create_thread(name=f"🗓️ {title.upper()}", auto_archive_duration=60)  # ใช้ .upper() สำหรับชื่อ Thread
+        await thread.send(f"📢 กิจกรรม `{title.upper()}` ถูกสร้างโดย <@{interaction.user.id}>")  # ใช้ .upper() สำหรับข้อความ
 
         event_data[msg.id] = {
             "title": title,
