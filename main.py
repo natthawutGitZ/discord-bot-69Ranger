@@ -292,24 +292,20 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # ✅ Auto Role ให้กับสมาชิกใหม่
-@bot.event
-async def on_member_join(member):
-    try:
-        # 👇 ใส่ชื่อ Role ที่ต้องการให้สมาชิกใหม่ได้รับ
-        role_name = "Civilian"
-        guild = member.guild
-        role = discord.utils.get(guild.roles, name=role_name)
-        
-        if role:
-            await member.add_roles(role)
-            print(f"✅ ให้ Role '{role.name}' กับ {member.name} แล้ว")
-        else:
-            print(f"❌ ไม่พบ Role ชื่อ '{role_name}'")
-
 # ✅ ต้อนรับสมาชิกใหม่
 @bot.event
 async def on_member_join(member):
     try:
+        # ให้ Role
+        role_name = "Civilian"
+        role = discord.utils.get(member.guild.roles, name=role_name)
+        if role:
+            await member.add_roles(role)
+            print(f"✅ ให้ Role '{role.name}' กับ {member.name} แล้ว")
+        else:
+            print(f"❌ ไม่พบ Role '{role_name}'")
+
+        # ส่งข้อความต้อนรับ
         welcome_message = """สวัสดี! ยินดีต้อนรับสู่เซิร์ฟเวอร์ของเรา!
 เราหวังว่าคุณจะมีความสนุกสนานและมีส่วนร่วมกับทุกคนที่นี่ :)
 ถ้าคุณมีคำถามหรือปัญหา สอบถามได้ที่ <#1281566308097462335>
@@ -318,7 +314,6 @@ async def on_member_join(member):
         print(f"✅ ส่งข้อความต้อนรับไปยัง {member.name}'s DM")
     except discord.Forbidden:
         print(f"❌ ไม่สามารถส่งข้อความให้ {member.name} ได้")
-
 
 
 
