@@ -53,13 +53,6 @@ class ConfirmView(discord.ui.View):
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="🚫 ยกเลิกการส่งข้อความ", view=None)
 
-# ✅ เมื่อบอทพร้อม
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f'✅ Logged in as {bot.user}')
-    activity = discord.Game(name="Arma 3 | 69RangerGTMCommunity")
-    await bot.change_presence(status=discord.Status.online, activity=activity)
 
 # ✅ Help แสดงคำสั่งทั้งหมดของบอท
 @bot.tree.command(name="help", description="แสดงคำสั่งทั้งหมดของบอท")
