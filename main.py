@@ -22,19 +22,7 @@ class EventJoinView(discord.ui.View):
         self.title = title
         self.event_time = event_time
 
-    @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.green)
-    async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_response(interaction, "going", button)
-
-    @discord.ui.button(label="❔ อาจจะมา", style=discord.ButtonStyle.gray)
-    async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_response(interaction, "maybe", button)
-
-    @discord.ui.button(label="❌ ไม่มา", style=discord.ButtonStyle.red)
-    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_response(interaction, "declined", button)
-
-   async def handle_response(self, interaction: discord.Interaction, status: str, button: discord.ui.Button):
+    async def handle_response(self, interaction: discord.Interaction, status: str, button: discord.ui.Button):
         message_id = interaction.message.id
         user_id = interaction.user.id
 
@@ -42,18 +30,60 @@ class EventJoinView(discord.ui.View):
             await interaction.response.send_message("❌ ไม่พบข้อมูลกิจกรรม", ephemeral=True)
             return
 
+        # ลบสถานะเก่า (ถ้ามี)
         for s in ["going", "maybe", "declined"]:
             if user_id in event_data[message_id][s]:
                 event_data[message_id][s].remove(user_id)
 
+        # เพิ่มสถานะใหม่
         event_data[message_id][status].append(user_id)
 
-        # แก้ไข embed
-        embed = interaction.message.embeds[0]
-        embed.set_field_at(4, name="📋 การเข้าร่วม", value=f"👍 เข้าร่วม: {len(event_data[message_id]['going'])}\n❔ อาจจะมา: {len(event_data[message_id]['maybe'])}\n❌ ไม่มา: {len(event_data[message_id]['declined'])}", inline=False)
-        await interaction.message.edit(embed=embed, view=self)
+        # ดึงชื่อสมาชิกที่ตอบแต่ละสถานะ
+        def format_names(user_ids):
+            if not user_ids:
+                return "- ไม่มี -"
+            names = []
+            for uid in user_ids:
+                member = interaction.guild.get_member(uid)
+                if member:
+                    names.append(f"- {member.display_name}")
+            return "\n".join(names)
 
+        # อัปเดต embed
+        if not interaction.message.embeds:
+            await interaction.response.send_message("❌ ไม่พบ embed ของกิจกรรมนี้", ephemeral=True)
+            return
+
+        embed = interaction.message.embeds[0]
+        embed.set_field_at(
+            4,
+            name="📋 การเข้าร่วม",
+            value=(
+                f"👍 เข้าร่วม: {len(event_data[message_id]['going'])}\n"
+                f"❔ อาจจะมา: {len(event_data[message_id]['maybe'])}\n"
+                f"❌ ไม่มา: {len(event_data[message_id]['declined'])}"
+            ),
+            inline=False
+        )
+
+        await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"📌 คุณตอบว่า: {button.label}", ephemeral=True)
+
+    # ✅ ปุ่ม "มาแน่นอน"
+    @discord.ui.button(label="✅ มาแน่นอน", style=discord.ButtonStyle.success)
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_response(interaction, "going", button)
+
+    # ❔ ปุ่ม "อาจจะมา"
+    @discord.ui.button(label="❔ อาจจะมา", style=discord.ButtonStyle.primary)
+    async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_response(interaction, "maybe", button)
+
+    # ❌ ปุ่ม "ไม่มา"
+    @discord.ui.button(label="❌ ไม่มา", style=discord.ButtonStyle.danger)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_response(interaction, "declined", button)
+
 
 @bot.tree.command(name="event", description="สร้างอีเวนต์ใหม่")
 @app_commands.describe(
@@ -65,6 +95,48 @@ class EventJoinView(discord.ui.View):
     channel="ห้องที่ต้องการโพสต์อีเวนต์",
     image_url="ลิงก์รูปภาพ (ไม่บังคับ)"
 )
+
+async def schedule_reminder(message_id):
+    await bot.wait_until_ready()
+    
+    if message_id not in event_data:
+        return
+
+    event_info = event_data[message_id]
+    event_time = event_info["event_time"]
+    notify_time = event_time - timedelta(minutes=10)
+
+    now = datetime.now(pytz.utc)
+    wait_seconds = (notify_time - now).total_seconds()
+
+    if wait_seconds > 0:
+        await asyncio.sleep(wait_seconds)
+
+    # ดึง guild, channel, message
+    guild = discord.utils.get(bot.guilds)
+    channel = guild.get_channel(event_info["channel_id"])
+    if not channel:
+        print(f"❌ ไม่พบช่องที่จะแจ้งเตือนสำหรับ event {message_id}")
+        return
+
+    try:
+        message = await channel.fetch_message(message_id)
+    except:
+        print(f"❌ ไม่พบข้อความ event {message_id}")
+        return
+
+    # ส่ง DM ให้คนที่กด 'going'
+    for uid in event_info["going"]:
+        member = guild.get_member(uid)
+        if member:
+            try:
+                await member.send(f"⏰ แจ้งเตือน: กิจกรรม **{event_info['title']}** จะเริ่มในอีก 10 นาที!")
+                await asyncio.sleep(1)
+            except discord.Forbidden:
+                print(f"❌ ไม่สามารถส่ง DM ให้ {member.display_name}")
+
+
+
 async def create_event(
     interaction: discord.Interaction,
     title: str,
@@ -75,6 +147,8 @@ async def create_event(
     channel: discord.TextChannel,
     image_url: str = None
 ):
+        # สร้าง task แจ้งเตือนล่วงหน้า 10 นาที
+    asyncio.create_task(schedule_reminder(msg.id))
     try:
         event_time = datetime.strptime(time, "%d-%m-%Y %H:%M")
         event_time = THAI_TZ.localize(event_time).astimezone(pytz.utc)
