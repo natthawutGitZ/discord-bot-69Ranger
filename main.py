@@ -109,40 +109,51 @@ async def create_event(
     image_url: str = None
 ):
     try:
+        # ตรวจสอบสิทธิ์ของบอทในช่อง
+        if not channel.permissions_for(interaction.guild.me).send_messages:
+            await interaction.response.send_message(
+                f"❌ บอทไม่มีสิทธิ์ส่งข้อความในช่อง {channel.mention}", ephemeral=True
+            )
+            return
+
         event_time = datetime.strptime(time, "%d-%m-%Y %H:%M")
         event_time = THAI_TZ.localize(event_time).astimezone(pytz.utc)
+
+        embed = discord.Embed(title=title, color=discord.Color.green())
+        embed.add_field(name="🛠️ Editor / Preset / Mod", value=editor_info, inline=False)
+        embed.add_field(name="📖 Story", value=story, inline=False)
+        embed.add_field(name="🎭 Roles", value=roles, inline=False)
+        embed.add_field(name="🕒 วันและเวลา", value=event_time.astimezone(THAI_TZ).strftime("%d-%m-%Y %H:%M น."), inline=False)
+        embed.add_field(name="📋 การเข้าร่วม", value="👍 เข้าร่วม: 0\n❔ อาจจะมา: 0\n❌ ไม่มา: 0", inline=False)
+
+        if image_url:
+            embed.set_image(url=image_url)
+
+        view = EventJoinView(title, event_time)
+        msg = await channel.send(embed=embed, view=view)
+
+        thread = await msg.create_thread(name=f"🗓️ {title}", auto_archive_duration=60)
+        await thread.send(f"📢 กิจกรรม `{title}` ถูกสร้างโดย <@{interaction.user.id}>")
+
+        event_data[msg.id] = {
+            "title": title,
+            "event_time": event_time,
+            "going": [],
+            "maybe": [],
+            "declined": [],
+            "thread_id": thread.id,
+            "message_id": msg.id,
+            "channel_id": channel.id
+        }
+
+        await interaction.response.send_message("✅ กิจกรรมถูกสร้างเรียบร้อยแล้ว!", ephemeral=True)
+
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ บอทไม่มีสิทธิ์ในช่องที่ระบุ", ephemeral=True)
     except ValueError:
         await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง! ใช้รูปแบบ: DD-MM-YYYY HH:MM", ephemeral=True)
-        return
-
-    embed = discord.Embed(title=title, color=discord.Color.green())
-    embed.add_field(name="🛠️ Editor / Preset / Mod", value=editor_info, inline=False)
-    embed.add_field(name="📖 Story", value=story, inline=False)
-    embed.add_field(name="🎭 Roles", value=roles, inline=False)
-    embed.add_field(name="🕒 วันและเวลา", value=event_time.astimezone(THAI_TZ).strftime("%d-%m-%Y %H:%M น."), inline=False)
-    embed.add_field(name="📋 การเข้าร่วม", value="👍 เข้าร่วม: 0\n❔ อาจจะมา: 0\n❌ ไม่มา: 0", inline=False)
-
-    if image_url:
-        embed.set_image(url=image_url)
-
-    view = EventJoinView(title, event_time)
-    msg = await channel.send(embed=embed, view=view)
-
-    thread = await msg.create_thread(name=f"🗓️ {title}", auto_archive_duration=60)
-    await thread.send(f"📢 กิจกรรม `{title}` ถูกสร้างโดย <@{interaction.user.id}>")
-
-    event_data[msg.id] = {
-        "title": title,
-        "event_time": event_time,
-        "going": [],
-        "maybe": [],
-        "declined": [],
-        "thread_id": thread.id,
-        "message_id": msg.id,
-        "channel_id": channel.id
-    }
-
-    await interaction.response.send_message("✅ กิจกรรมถูกสร้างเรียบร้อยแล้ว!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ เกิดข้อผิดพลาด: {e}", ephemeral=True)
 
 #=============================================================================================
 #⚠️ /Help แสดงคำสั่งทั้งหมดของบอท
