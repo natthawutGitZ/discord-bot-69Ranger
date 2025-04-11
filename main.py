@@ -2,12 +2,10 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
-import openai
 from keep_alive import keep_alive
 import asyncio
 from datetime import datetime, timedelta
 import pytz
-
 
 # ตั้งค่า intents
 intents = discord.Intents.default()
@@ -16,9 +14,6 @@ intents.members = True
 
 # สร้างบอท
 bot = commands.Bot(command_prefix='!', intents=intents)
-
-# ตั้งค่า OpenAI API Key
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # ข้อมูลอีเวนต์ทั้งหมด
 event_data = {}
@@ -35,146 +30,58 @@ class ChannelSelect(discord.ui.ChannelSelect):
             max_values=1,
             channel_types=[discord.ChannelType.text]
         )
-        self.event_data = event_data  # <<== เพิ่มบรรทัดนี้
+        self.event_data = event_data
 
-
-class EventView(discord.ui.View):
-    def __init__(self, event_id):
-        super().__init__(timeout=None)
-        self.event_id = event_id
-
-    @discord.ui.button(label="✅ มาแน่นอน", style=discord.ButtonStyle.green)
-    async def going(self, interaction: discord.Interaction, button: discord.ui.Button):
-        clear_user_from_all(self.event_id, interaction.user)
-        event_data[self.event_id]["going"].add(interaction.user)
-        await self.update_message(interaction)
-
-    @discord.ui.button(label="❓ อาจจะมา", style=discord.ButtonStyle.gray)
-    async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
-        clear_user_from_all(self.event_id, interaction.user)
-        event_data[self.event_id]["maybe"].add(interaction.user)
-        await self.update_message(interaction)
-
-    @discord.ui.button(label="❌ ไม่มา", style=discord.ButtonStyle.red)
-    async def not_going(self, interaction: discord.Interaction, button: discord.ui.Button):
-        clear_user_from_all(self.event_id, interaction.user)
-        event_data[self.event_id]["not_going"].add(interaction.user)
-        await self.update_message(interaction)
-
-    @discord.ui.button(label="📝 Edit", style=discord.ButtonStyle.blurple, row=1)
-    async def edit_event(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🛠 ฟีเจอร์แก้ไขกำลังพัฒนา", ephemeral=True)
-
-    @discord.ui.button(label="🗑 Delete", style=discord.ButtonStyle.red, row=1)
-    async def delete_event(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user == event_data[self.event_id]["creator"]:
-            del event_data[self.event_id]
-            await interaction.message.delete()
-        else:
-            await interaction.response.send_message("❌ คุณไม่ใช่ผู้สร้างกิจกรรมนี้", ephemeral=True)
-
-    async def update_message(self, interaction):
-        embed = generate_event_embed(self.event_id)
-        await interaction.response.edit_message(embed=embed, view=self)
-
-def clear_user_from_all(event_id, user):
-    for group in ["going", "maybe", "not_going"]:
-        event_data[event_id][group].discard(user)
-
-def generate_event_embed(event_id):
-    data = event_data[event_id]
-    local_time = data['time'].astimezone(THAI_TZ)
-
-    # วันในสัปดาห์ ภาษาไทย
-    weekday_thai = {
-        0: "วันจันทร์",
-        1: "วันอังคาร",
-        2: "วันพุธ",
-        3: "วันพฤหัสบดี",
-        4: "วันศุกร์",
-        5: "วันเสาร์",
-        6: "วันอาทิตย์"
-    }
-
-    # เดือน ภาษาไทย
-    thai_months = [
-        "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-    ]
-
-    # แปลงวันเวลา
-    weekday = weekday_thai[local_time.weekday()]
-    day = local_time.day
-    month = thai_months[local_time.month]
-    year = local_time.year + 543  # พ.ศ.
-    time_str = local_time.strftime("%H:%M")
-
-    # สร้างข้อความเวลาแบบไทย
-    thai_time_str = f"{weekday}ที่ {day} {month} {year} เวลา {time_str} น."
-    embed = discord.Embed(
-        title=f"📌 Operation: {data['title']}",
-        description=data["description"],
-        color=discord.Color.dark_red()
-    )
-    embed.add_field(name=f"✅ Accepted ({len(data['going'])})",
-                    value="\n".join(user.display_name for user in data["going"]) or "ไม่มี", inline=True)
-    embed.add_field(name=f"❌ Declined ({len(data['not_going'])})",
-                    value="\n".join(user.display_name for user in data["not_going"]) or "ไม่มี", inline=True)
-    embed.add_field(name=f"❓ Tentative ({len(data['maybe'])})",
-                    value="\n".join(user.display_name for user in data["maybe"]) or "ไม่มี", inline=True)
-    embed.add_field(name="🕒 Time",
-                    value=f"{local_time.strftime('%d-%m-%Y %H:%M')} น. [เพิ่มใน Google](https://calendar.google.com/calendar/render?action=TEMPLATE&text={data['title'].replace(' ', '+')}&dates={data['time'].strftime('%Y%m%dT%H%M00')}/{(data['time'] + timedelta(hours=2)).strftime('%Y%m%dT%H%M00')})",
-                    inline=False)
-    if "image_url" in data:
-        embed.set_image(url=data["image_url"])
-    embed.set_footer(text=f"Created by {data['creator'].display_name}")
-    return embed
 class ConfirmEventView(discord.ui.View):
     def __init__(self, title, description, event_time, image_url, interaction):
         super().__init__(timeout=None)
-      event_data = {
-        "title": title,
-        "description": description,
-        "event_time": event_time,
-        "image_url": image_url
-}
-self.add_item(ChannelSelect(event_data))
 
-    @discord.ui.button(label="✅ ยืนยันสร้างกิจกรรม", style=discord.ButtonStyle.green)
+        self.user = interaction.user
+        self.title = title
+        self.description = description
+        self.event_time = event_time
+        self.image_url = image_url
+
+        event_data_temp = {
+            "title": title,
+            "description": description,
+            "event_time": event_time,
+            "image_url": image_url
+        }
+
+        self.channel_select = ChannelSelect(event_data_temp)
+        self.add_item(self.channel_select)
+
+    @discord.ui.button(label="ยืนยัน", style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            await interaction.response.send_message("❌ เฉพาะผู้สร้างเท่านั้นที่สามารถยืนยันได้", ephemeral=True)
+            await interaction.response.send_message("คุณไม่สามารถยืนยันกิจกรรมนี้ได้", ephemeral=True)
             return
 
-        # เพิ่มการโพสต์กิจกรรมในห้องที่เลือก
-        selected_channel = interaction.guild.get_channel(int(self.channel_select.values[0]))
-        event_id = len(event_data)
-        event_data[event_id] = {
-            "title": self.title,
-            "description": self.description,
-            "time": self.event_time,
-            "going": set(),
-            "maybe": set(),
-            "not_going": set(),
-            "notified": False,
-            "creator": self.user,
-            "image_url": self.image_url
-        }
-        embed = generate_event_embed(event_id)
-        view = EventView(event_id)
-        
-        # โพสต์กิจกรรมในช่องที่เลือก
-        await selected_channel.send(embed=embed, view=view)
+        selected_channel_id = self.channel_select.values[0]
+        selected_channel = interaction.guild.get_channel(int(selected_channel_id))
 
-        await interaction.response.edit_message(content="✅ กิจกรรมถูกสร้างแล้ว", embed=embed, view=view)
+        embed = discord.Embed(
+            title=self.title,
+            description=self.description,
+            color=discord.Color.green()
+        )
+        embed.add_field(name="🕒 วันและเวลา", value=self.event_time.strftime("%d/%m/%Y %H:%M"))
+        if self.image_url:
+            embed.set_image(url=self.image_url)
 
-    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.red)
+        await selected_channel.send(embed=embed)
+        await interaction.response.send_message("กิจกรรมถูกโพสต์เรียบร้อยแล้ว", ephemeral=True)
+        self.stop()
+
+    @discord.ui.button(label="ยกเลิก", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            await interaction.response.send_message("❌ เฉพาะผู้สร้างเท่านั้นที่สามารถยกเลิกได้", ephemeral=True)
-
+            await interaction.response.send_message("คุณไม่สามารถยกเลิกกิจกรรมนี้ได้", ephemeral=True)
             return
-        await interaction.response.edit_message(content="🚫 ยกเลิกการสร้างกิจกรรมแล้ว", embed=None, view=None)
+
+        await interaction.response.send_message("การสร้างกิจกรรมถูกยกเลิก", ephemeral=True)
+        self.stop()
 
 @bot.tree.command(name="event", description="สร้างอีเวนต์ใหม่")
 @app_commands.describe(title="หัวข้อ", description="รายละเอียด", time="เวลา (เช่น 11-04-2025 18:30)", image_url="ลิงก์รูปภาพ (ไม่บังคับ)")
@@ -191,8 +98,10 @@ async def create_event(interaction: discord.Interaction, title: str, description
     embed.add_field(name="🕒 เวลา", value=f"{event_time.astimezone(THAI_TZ).strftime('%d-%m-%Y %H:%M')} น.", inline=False)
     if image_url:
         embed.set_image(url=image_url)
+
     view = ConfirmEventView(title, description, event_time, image_url, interaction)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
 
 # ==== ระบบหลักอื่น ๆ ====
 
@@ -284,30 +193,6 @@ async def dm(interaction: discord.Interaction, role: discord.Role, message: str)
         view=view,
         ephemeral=True
     )
-
-# ✅ ถาม AI ด้วย OpenAI API
-@bot.event
-async def on_message(message):
-    if message.author == bot.user:
-        return
-
-    if message.content.startswith("ถาม "):
-        question = message.content[4:].strip()
-        await message.channel.send("🤖 กำลังคิด...")
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "คุณคือผู้ช่วย AI ภาษาไทยที่สุภาพและให้ข้อมูลอย่างชัดเจน"},
-                    {"role": "user", "content": question}
-                ]
-            )
-            reply = response.choices[0].message['content']
-            await message.channel.send(reply)
-        except Exception as e:
-            await message.channel.send(f"❌ เกิดข้อผิดพลาด: {e}")
-
-    await bot.process_commands(message)
 
 # ✅ Auto Role ให้กับสมาชิกใหม่
 # ✅ ต้อนรับสมาชิกใหม่
