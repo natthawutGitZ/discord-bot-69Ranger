@@ -396,4 +396,4 @@ async def on_ready():
 #=============================================================================================
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))
-print(os.getenv("DISCORD_TOKEN"))
+print("📌 Debug: Reached this point")
