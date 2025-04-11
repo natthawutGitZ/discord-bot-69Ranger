@@ -66,7 +66,7 @@ def format_names(user_ids, guild):
 # EventJoinView class for handling event responses
 class EventJoinView(discord.ui.View):
     def __init__(self, title, event_time, creator_id):
-        super().__init__(timeout=None)
+        super().__init__(timeout=None)  # ตั้งค่า timeout=None เพื่อป้องกัน View หมดอายุ
         self.title = title
         self.event_time = event_time
         self.creator_id = creator_id  # เพิ่มตัวแปรสำหรับเก็บ ID ของผู้สร้างกิจกรรม
@@ -304,7 +304,7 @@ async def status_command(interaction: discord.Interaction):
 #⚠️ /DM ส่ง ข้อความ DM 
 class ConfirmView(discord.ui.View):
     def __init__(self, role, message, members):
-        super().__init__(timeout=60)
+        super().__init__(timeout=None)  # ตั้งค่า timeout=None เพื่อป้องกัน View หมดอายุ
         self.role = role
         self.message = message
         self.members = members
@@ -384,16 +384,7 @@ async def on_ready():
         status=discord.Status.online,
         activity=discord.Game(name="Arma 3 | 69RangerGTMCommunit")
     )
-    try:
-        # ซิงค์คำสั่ง Slash Command
-        synced = await bot.tree.sync()
-        print(f"✅ Synced {len(synced)} global command(s).")
-        for cmd in synced:
-            print(f"📌 Synced command: /{cmd.name}")
-    except Exception as e:
-        print(f"❌ Sync failed: {e}")
-   
+    
 #=============================================================================================
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))
-print("📌 Debug: Reached this point")
