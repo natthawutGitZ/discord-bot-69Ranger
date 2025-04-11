@@ -22,19 +22,19 @@ class EventJoinView(discord.ui.View):
         self.title = title
         self.event_time = event_time
 
-    @discord.ui.button(label="👍 เข้าร่วม", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_response(interaction, "going")
+        await self.handle_response(interaction, "going", button)
 
     @discord.ui.button(label="❔ อาจจะมา", style=discord.ButtonStyle.gray)
     async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_response(interaction, "maybe")
+        await self.handle_response(interaction, "maybe", button)
 
     @discord.ui.button(label="❌ ไม่มา", style=discord.ButtonStyle.red)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_response(interaction, "declined")
+        await self.handle_response(interaction, "declined", button)
 
-    async def handle_response(self, interaction: discord.Interaction, status: str):
+   async def handle_response(self, interaction: discord.Interaction, status: str, button: discord.ui.Button):
         message_id = interaction.message.id
         user_id = interaction.user.id
 
