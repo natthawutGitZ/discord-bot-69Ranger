@@ -6,7 +6,6 @@ from keep_alive import keep_alive
 import asyncio
 from datetime import datetime, timedelta
 
-
 # Initialize bot and intents
 intents = discord.Intents.default()
 intents.message_content = True
