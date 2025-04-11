@@ -4,37 +4,37 @@ from discord import app_commands
 import os
 import openai
 from keep_alive import keep_alive
+import asyncio
 
 # ตั้งค่า intents
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True  # ต้องเปิดใช้งานเพื่อให้บอทสามารถจับเหตุการณ์เมื่อมีสมาชิกใหม่เข้าร่วมเซิร์ฟเวอร์
+intents.members = True
 
 # ตั้งค่า OpenAI API Key
-openai.api_key = os.getenv("OPENAI_API_KEY")  # ตั้งค่า API Key ของ OpenAI
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # สร้างบอท
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# เมื่อบอทพร้อมใช้งาน
 @bot.event
 async def on_ready():
-    await bot.tree.sync()  # ✅ Sync Slash Commands
+    await bot.tree.sync()
     print(f'✅ Logged in as {bot.user}')
     activity = discord.Game(name="Arma 3 | 69RangerGTMCommunit")
     await bot.change_presence(status=discord.Status.online, activity=activity)
 
-# !ping (ปกติ)
+# ✅ Ping (ปกติ)
 @bot.command()
 async def ping(ctx):
     await ctx.send('กำลังทำงาน [ปกติ]')
 
-# ✅ /ping (Slash Command)
+# ✅ Ping (Slash)
 @bot.tree.command(name="ping", description="ทดสอบสถานะของบอท")
 async def slash_ping(interaction: discord.Interaction):
     await interaction.response.send_message("บอทยังทำงานอยู่ 🟢")
 
-# รองรับข้อความ "ถาม ..."
+# ✅ ถาม AI
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -44,7 +44,6 @@ async def on_message(message):
         question = message.content[4:].strip()
         await message.channel.send("🤖 กำลังคิด...")
         try:
-            # ส่งคำถามไปยัง OpenAI API
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -52,35 +51,78 @@ async def on_message(message):
                     {"role": "user", "content": question}
                 ]
             )
-            # รับคำตอบจาก OpenAI
             reply = response.choices[0].message['content']
             await message.channel.send(reply)
         except Exception as e:
             await message.channel.send(f"❌ เกิดข้อผิดพลาด: {e}")
 
-    # ให้บอทจัดการคำสั่งที่ไม่ได้อยู่ใน on_message
     await bot.process_commands(message)
 
-# เมื่อมีผู้เข้าร่วมเซิร์ฟเวอร์
+# ✅ ต้อนรับสมาชิกใหม่
 @bot.event
 async def on_member_join(member):
     try:
-        # ข้อความต้อนรับ
         welcome_message = """สวัสดี! ยินดีต้อนรับสู่เซิร์ฟเวอร์ของเรา!
 เราหวังว่าคุณจะมีความสนุกสนานและมีส่วนร่วมกับทุกคนที่นี่ :)
 ถ้าคุณมีคำถามหรือปัญหา สอบถามได้ที่ https://discord.com/channels/395940778418896907/1281566308097462335 
 หากต้องการเข้าร่วม สามารถกรอกใบสมัครได้ที่ https://discord.com/channels/395940778418896907/1349726875030913085 """
-        
-        # ส่งข้อความต้อนรับไปยัง DM ของผู้ใช้
         await member.send(welcome_message)
         print(f"ส่งข้อความต้อนรับไปยัง {member.name}'s DM")
     except discord.Forbidden:
-        # ถ้าไม่สามารถส่ง DM ได้ (ถ้าผู้ใช้ปิดการรับ DM)
         print(f"ไม่สามารถส่งข้อความต้อนรับให้ {member.name} ได้")
 
-# ป้องกันบอทหลับ
+# ✅ Slash Command: /dm
+@bot.tree.command(name="dm", description="ส่ง DM ให้สมาชิกเฉพาะ Role (เฉพาะแอดมิน)")
+@app_commands.describe(role="เลือก Role ที่ต้องการส่งถึง", message="ข้อความที่จะส่ง")
+async def dm(interaction: discord.Interaction, role: discord.Role, message: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้ (ต้องเป็นแอดมิน)", ephemeral=True)
+        return
+
+    members = [m for m in role.members if not m.bot]
+
+    if not members:
+        await interaction.response.send_message("❌ ไม่มีสมาชิกใน Role นี้ที่สามารถส่ง DM ได้", ephemeral=True)
+        return
+
+    view = ConfirmView(role, message, members)
+    await interaction.response.send_message(
+        f"⚠️ คุณต้องการส่งข้อความนี้ให้กับ `{len(members)}` คนใน Role `{role.name}` หรือไม่?\n\n📨 ข้อความ:\n```{message}```",
+        view=view,
+        ephemeral=True
+    )
+
+# ✅ ปุ่มยืนยันส่งข้อความ
+class ConfirmView(discord.ui.View):
+    def __init__(self, role, message, members):
+        super().__init__(timeout=60)
+        self.role = role
+        self.message = message
+        self.members = members
+
+    @discord.ui.button(label="✅ ยืนยัน", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="📤 เริ่มส่งข้อความ...", view=None)
+
+        success = 0
+        failed = 0
+        for member in self.members:
+            try:
+                await member.send(self.message)
+                success += 1
+            except:
+                failed += 1
+            await asyncio.sleep(1)
+
+        await interaction.followup.send(f"✅ ส่งสำเร็จ: {success} คน\n❌ ส่งไม่สำเร็จ: {failed} คน", ephemeral=True)
+
+    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="🚫 ยกเลิกการส่งข้อความ", view=None)
+
+# ✅ ป้องกันบอทหลับ
 keep_alive()
 
-# รันบอท
+# ✅ รันบอท
 TOKEN = os.getenv("DISCORD_TOKEN")
 bot.run(TOKEN)
