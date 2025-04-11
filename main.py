@@ -53,6 +53,22 @@ async def on_ready():
     activity = discord.Game(name="Arma 3 | 69RangerGTMCommunity")
     await bot.change_presence(status=discord.Status.online, activity=activity)
 
+# ✅ Help แสดงคำสั่งทั้งหมดของบอท
+@bot.tree.command(name="help", description="แสดงคำสั่งทั้งหมดของบอท")
+async def help_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📜 รายการคำสั่งของบอท",
+        description="คำสั่งทั้งหมดที่สามารถใช้งานได้",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="/ping", value="ทดสอบว่าบอทออนไลน์หรือไม่", inline=False)
+    embed.add_field(name="/dm", value="ส่ง DM ให้กับสมาชิกที่อยู่ใน Role (เฉพาะแอดมิน)", inline=False)
+    embed.add_field(name="ถาม [ข้อความ]", value="ถามคำถามทั่วไปกับ AI", inline=False)
+    embed.set_footer(text="69Ranger Gentleman Community Bot")
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 # ✅ Ping (Slash)
 @bot.tree.command(name="ping", description="ทดสอบสถานะของบอท")
 async def slash_ping(interaction: discord.Interaction):
@@ -115,6 +131,16 @@ async def on_member_join(member):
         print(f"✅ ส่งข้อความต้อนรับไปยัง {member.name}'s DM")
     except discord.Forbidden:
         print(f"❌ ไม่สามารถส่งข้อความให้ {member.name} ได้")
+
+# ✅ แสดงคำสั่ง Slash บนหน้า Bot Profile
+@bot.event
+async def on_ready():
+    try:
+        synced = await bot.tree.sync()  # <-- Global Sync
+        print(f"✅ Synced {len(synced)} global command(s).")
+    except Exception as e:
+        print(f"❌ Sync failed: {e}")
+
 
 # ✅ ป้องกันบอทหลับ
 keep_alive()
