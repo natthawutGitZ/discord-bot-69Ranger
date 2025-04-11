@@ -145,7 +145,7 @@ class ConfirmEventView(discord.ui.View):
         self.description = description
         self.event_time = event_time
         self.image_url = image_url
-        self.user = interaction.user
+        self.user = interaction
         self.channel_select = ChannelSelect(interaction)
         self.add_item(self.channel_select)
 
@@ -200,7 +200,7 @@ async def create_event(interaction: discord.Interaction, title: str, description
     embed.add_field(name="🕒 เวลา", value=f"{event_time.astimezone(THAI_TZ).strftime('%d-%m-%Y %H:%M')} น.", inline=False)
     if image_url:
         embed.set_image(url=image_url)
-    view = ConfirmEventView(title, description, event_time, image_url, interaction.user)
+    view = ConfirmEventView(title, description, event_time, image_url, interaction)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 # ==== ระบบหลักอื่น ๆ ====
