@@ -6,6 +6,7 @@ from keep_alive import keep_alive
 import asyncio
 from datetime import datetime, timedelta
 
+
 # Initialize bot and intents
 intents = discord.Intents.default()
 intents.message_content = True
@@ -73,33 +74,36 @@ class EventJoinView(discord.ui.View):
     async def handle_response(self, interaction: discord.Interaction, status: str, button: discord.ui.Button):
         message_id = interaction.message.id
         user_id = interaction.user.id
-
-
     
         if message_id not in event_data:
             await interaction.response.send_message("❌ ไม่พบข้อมูลกิจกรรม", ephemeral=True)
             return
-
+    
         # Remove old status if exists
         for s in ["going", "maybe", "declined"]:
             if user_id in event_data[message_id][s]:
                 event_data[message_id][s].remove(user_id)
-
+    
         # Add new status
         event_data[message_id][status].append(user_id)
-
+    
         # Update embed
         if not interaction.message.embeds:
             await interaction.response.send_message("❌ ไม่พบ embed ของกิจกรรมนี้", ephemeral=True)
             return
-
+    
         embed = interaction.message.embeds[0]
-
+    
         # Format user names for each status
         going_names = format_names(event_data[message_id]["going"], interaction.guild)
         maybe_names = format_names(event_data[message_id]["maybe"], interaction.guild)
         declined_names = format_names(event_data[message_id]["declined"], interaction.guild)
-
+    
+        # Ensure fields exist before updating
+        fields = embed.fields
+        while len(fields) < 6:  # Ensure there are at least 6 fields
+            embed.add_field(name="Placeholder", value="-", inline=True)
+    
         # Update the embed fields with column layout
         embed.set_field_at(
             4,
@@ -119,10 +123,9 @@ class EventJoinView(discord.ui.View):
             value=declined_names or "- ไม่มี -",
             inline=True
         )
-
+    
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"📌 คุณตอบว่า: {button.label}", ephemeral=True)
-
     # Buttons for event responses
     @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
