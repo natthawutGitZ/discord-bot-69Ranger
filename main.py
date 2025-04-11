@@ -5,7 +5,7 @@ import os
 from keep_alive import keep_alive
 import asyncio
 from datetime import datetime, timedelta
-import pytz
+
 
 # Initialize bot and intents
 intents = discord.Intents.default()
@@ -13,10 +13,25 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
+
 event_data = {}
+
+from babel.dates import format_datetime
+from datetime import datetime
+import pytz
+
 THAI_TZ = pytz.timezone("Asia/Bangkok")
+now = datetime.now(THAI_TZ)
+
+formatted_date = format_datetime(now, "EEEEที่ d MMMM yyyy HH:mm", locale="th")
+print(formatted_date)
+
 import locale
-locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")  # ตั้งค่าภาษาไทยสำหรับวันที่
+try:
+    locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")  # ตั้งค่าภาษาไทยสำหรับวันที่
+except locale.Error:
+    print("❌ Locale 'th_TH.UTF-8' is not supported. Falling back to default locale.")
+    locale.setlocale(locale.LC_TIME, "")  # ใช้ locale เริ่มต้นของระบบแทน
 
 def format_event_time(start_time: datetime, end_time: datetime, timezone: pytz.timezone) -> str:
     """จัดรูปแบบวันเวลาในรูปแบบที่กำหนด"""
