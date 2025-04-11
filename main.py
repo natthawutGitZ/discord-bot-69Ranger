@@ -8,6 +8,7 @@ import asyncio
 from datetime import datetime, timedelta
 import pytz
 
+
 # ตั้งค่า intents
 intents = discord.Intents.default()
 intents.message_content = True
