@@ -32,7 +32,8 @@ async def on_ready():
         print(f"✅ Synced {len(synced)} global command(s).")
     except Exception as e:
         print(f"❌ Sync failed: {e}")
-
+    for cmd in bot.tree.get_commands():
+        print(f"📌 Synced command: /{cmd.name}")
 
 # ✅ ปุ่มยืนยันก่อนส่งข้อความ
 class ConfirmView(discord.ui.View):
@@ -128,6 +129,21 @@ async def on_message(message):
             await message.channel.send(f"❌ เกิดข้อผิดพลาด: {e}")
 
     await bot.process_commands(message)
+
+# ✅ Auto Role ให้กับสมาชิกใหม่
+@bot.event
+async def on_member_join(member):
+    try:
+        # 👇 ใส่ชื่อ Role ที่ต้องการให้สมาชิกใหม่ได้รับ
+        role_name = "Civilian"
+        guild = member.guild
+        role = discord.utils.get(guild.roles, name=role_name)
+        
+        if role:
+            await member.add_roles(role)
+            print(f"✅ ให้ Role '{role.name}' กับ {member.name} แล้ว")
+        else:
+            print(f"❌ ไม่พบ Role ชื่อ '{role_name}'")
 
 # ✅ ต้อนรับสมาชิกใหม่
 @bot.event
