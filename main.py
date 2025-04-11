@@ -17,6 +17,14 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # ตั้งค่า OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# ✅ แสดงสถานะ Arma 3 | 69RangerGTMCommunit
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f'✅ Logged in as {bot.user}')
+    activity = discord.Game(name="Arma 3 | 69RangerGTMCommunit")
+    await bot.change_presence(status=discord.Status.online, activity=activity)
+
 # ✅ ปุ่มยืนยันก่อนส่งข้อความ
 class ConfirmView(discord.ui.View):
     def __init__(self, role, message, members):
