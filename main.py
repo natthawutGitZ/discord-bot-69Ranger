@@ -23,7 +23,7 @@ import pytz
 THAI_TZ = pytz.timezone("Asia/Bangkok")
 now = datetime.now(THAI_TZ)
 
-formatted_date = format_datetime(now, "EEEEที่ d MMMM yyyy HH:mm", locale="th")
+formatted_date = format_datetime(now, "EEEE d MMMM yyyy HH:mm", locale="th")
 print(formatted_date)
 
 import locale
@@ -34,22 +34,46 @@ except locale.Error:
     locale.setlocale(locale.LC_TIME, "")  # ใช้ locale เริ่มต้นของระบบแทน
 
 def format_event_time(start_time: datetime, end_time: datetime, timezone: pytz.timezone) -> str:
-    """จัดรูปแบบวันเวลาในรูปแบบที่กำหนด"""
+    """จัดรูปแบบวันเวลาในภาษาไทย พร้อมแสดงเวลาที่เหลือหรือเวลาที่ผ่านมา"""
     start_local = start_time.astimezone(timezone)
     end_local = end_time.astimezone(timezone)
 
     # แปลงวันที่เป็นภาษาไทย
-    start_date = start_local.strftime("%Aที่ %d %B %Y %H:%M")
+    start_date = format_datetime(start_local, "EEEE d MMMM yyyy HH:mm", locale="th")
     end_time_str = end_local.strftime("%H:%M")
 
-    # คำนวณเวลาที่ผ่านมา
+    # คำนวณเวลาปัจจุบัน
     now = datetime.now(timezone)
-    time_diff = now - start_local
-    days_ago = time_diff.days
+    if now < start_local:
+        # เหลือเวลาอีก
+        time_diff = start_local - now
+        if time_diff.days > 0:
+            time_text = f"เหลือเวลาอีก {time_diff.days} วัน"
+        else:
+            hours = time_diff.seconds // 3600
+            minutes = (time_diff.seconds % 3600) // 60
+            if hours > 0:
+                time_text = f"เหลือเวลาอีก {hours} ชั่วโมง"
+            else:
+                time_text = f"เหลือเวลาอีก {minutes} นาที"
+    elif now > end_local:
+        # ผ่านมาแล้ว
+        time_diff = now - end_local
+        if time_diff.days > 0:
+            time_text = f"{time_diff.days} วันที่ผ่านมา"
+        else:
+            hours = time_diff.seconds // 3600
+            minutes = (time_diff.seconds % 3600) // 60
+            if hours > 0:
+                time_text = f"{hours} ชั่วโมงที่ผ่านมา"
+            else:
+                time_text = f"{minutes} นาทีที่ผ่านมา"
+    else:
+        # กำลังเกิดขึ้น
+        time_text = "กำลังดำเนินการ"
 
     # สร้างข้อความ
-    days_ago_text = f"{days_ago} วันที่แล้ว" if days_ago > 0 else "วันนี้"
-    return f"{start_date} - {end_time_str} | {days_ago_text}"
+    return f"{start_date} - {end_time_str} | {time_text}"
 #=============================================================================================
 # Load token from environment variable ฟังก์ชันนี้จะจัดรูปแบบรายชื่อผู้ใช้ในแต่ละสถานะให้อยู่ในรูปแบบแนวตั้ง (แสดงชื่อผู้ใช้แต่ละคนในแต่ละบรรทัด):
 def format_names(user_ids, guild):
