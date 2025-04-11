@@ -28,11 +28,13 @@ THAI_TZ = pytz.timezone("Asia/Bangkok")
 
 # คลาสสำหรับการเลือกห้อง
 class ChannelSelect(discord.ui.Select):
-    def __init__(self):
-        options = []
-        # ดึงห้องทั้งหมดในเซิร์ฟเวอร์ที่สามารถโพสต์ได้
-        for channel in interaction.guild.text_channels:
-            options.append(discord.SelectOption(label=channel.name, value=str(channel.id)))
+    def __init__(self, interaction):
+        options = [
+            discord.SelectOption(label=channel.name, value=str(channel.id))
+            for channel in interaction.guild.text_channels
+        ]
+        super().__init__(placeholder="เลือกช่องสำหรับอีเวนต์", min_values=1, max_values=1, options=options)
+
 
         super().__init__(placeholder="เลือกห้องที่ต้องการโพสต์กิจกรรม", min_values=1, max_values=1, options=options)
 
@@ -91,10 +93,37 @@ def clear_user_from_all(event_id, user):
 def generate_event_embed(event_id):
     data = event_data[event_id]
     local_time = data['time'].astimezone(THAI_TZ)
+
+    # วันในสัปดาห์ ภาษาไทย
+    weekday_thai = {
+        0: "วันจันทร์",
+        1: "วันอังคาร",
+        2: "วันพุธ",
+        3: "วันพฤหัสบดี",
+        4: "วันศุกร์",
+        5: "วันเสาร์",
+        6: "วันอาทิตย์"
+    }
+
+    # เดือน ภาษาไทย
+    thai_months = [
+        "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ]
+
+    # แปลงวันเวลา
+    weekday = weekday_thai[local_time.weekday()]
+    day = local_time.day
+    month = thai_months[local_time.month]
+    year = local_time.year + 543  # พ.ศ.
+    time_str = local_time.strftime("%H:%M")
+
+    # สร้างข้อความเวลาแบบไทย
+    thai_time_str = f"{weekday}ที่ {day} {month} {year} เวลา {time_str} น."
     embed = discord.Embed(
         title=f"📌 Operation: {data['title']}",
         description=data["description"],
-        color=discord.Color.dark_purple()
+        color=discord.Color.dark_red()
     )
     embed.add_field(name=f"✅ Accepted ({len(data['going'])})",
                     value="\n".join(user.display_name for user in data["going"]) or "ไม่มี", inline=True)
@@ -109,18 +138,15 @@ def generate_event_embed(event_id):
         embed.set_image(url=data["image_url"])
     embed.set_footer(text=f"Created by {data['creator'].display_name}")
     return embed
-
 class ConfirmEventView(discord.ui.View):
-    def __init__(self, title, description, event_time, image_url, user):
-        super().__init__(timeout=60)
+    def __init__(self, title, description, event_time, image_url, interaction):
+        super().__init__(timeout=None)
         self.title = title
         self.description = description
         self.event_time = event_time
         self.image_url = image_url
-        self.user = user
-
-        # เพิ่มช่องเลือกห้องในหน้าต่าง Confirm
-        self.channel_select = ChannelSelect()
+        self.user = interaction.user
+        self.channel_select = ChannelSelect(interaction)
         self.add_item(self.channel_select)
 
     @discord.ui.button(label="✅ ยืนยันสร้างกิจกรรม", style=discord.ButtonStyle.green)
@@ -154,7 +180,7 @@ class ConfirmEventView(discord.ui.View):
     @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            await interaction.response.send_message("❌ เฉพาะผู้สร้างเท่านั้นที่สามารถยกเลิกได้", ephemeral=True)
+            await interaction.response.send_message("❌ เฉพาะผู้สร้างเท่านั้นที่สามารถยกเลิกได้", ephemeral=True
             return
         await interaction.response.edit_message(content="🚫 ยกเลิกการสร้างกิจกรรมแล้ว", embed=None, view=None)
 
