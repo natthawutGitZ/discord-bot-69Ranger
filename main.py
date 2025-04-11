@@ -15,32 +15,53 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 event_data = {}
 THAI_TZ = pytz.timezone("Asia/Bangkok")
+import locale
+locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")  # ตั้งค่าภาษาไทยสำหรับวันที่
 
+def format_event_time(start_time: datetime, end_time: datetime, timezone: pytz.timezone) -> str:
+    """จัดรูปแบบวันเวลาในรูปแบบที่กำหนด"""
+    start_local = start_time.astimezone(timezone)
+    end_local = end_time.astimezone(timezone)
+
+    # แปลงวันที่เป็นภาษาไทย
+    start_date = start_local.strftime("%Aที่ %d %B %Y %H:%M")
+    end_time_str = end_local.strftime("%H:%M")
+
+    # คำนวณเวลาที่ผ่านมา
+    now = datetime.now(timezone)
+    time_diff = now - start_local
+    days_ago = time_diff.days
+
+    # สร้างข้อความ
+    days_ago_text = f"{days_ago} วันที่แล้ว" if days_ago > 0 else "วันนี้"
+    return f"{start_date} - {end_time_str} | {days_ago_text}"
 #=============================================================================================
-# Helper function to format user names
+# Load token from environment variable ฟังก์ชันนี้จะจัดรูปแบบรายชื่อผู้ใช้ในแต่ละสถานะให้อยู่ในรูปแบบแนวตั้ง (แสดงชื่อผู้ใช้แต่ละคนในแต่ละบรรทัด):
 def format_names(user_ids, guild):
     """Format user names for display."""
     if not user_ids:
-        return "- ไม่มี -"
+        return None
     names = []
     for uid in user_ids:
         member = guild.get_member(uid)
         if member:
-            names.append(f"- {member.display_name}")
+            names.append(f"{member.display_name}")
     return "\n".join(names)
-
 #=============================================================================================
 # EventJoinView class for handling event responses
 class EventJoinView(discord.ui.View):
-    def __init__(self, title, event_time):
+    def __init__(self, title, event_time, creator_id):
         super().__init__(timeout=None)
         self.title = title
         self.event_time = event_time
+        self.creator_id = creator_id  # เพิ่มตัวแปรสำหรับเก็บ ID ของผู้สร้างกิจกรรม
 
     async def handle_response(self, interaction: discord.Interaction, status: str, button: discord.ui.Button):
         message_id = interaction.message.id
         user_id = interaction.user.id
 
+
+    
         if message_id not in event_data:
             await interaction.response.send_message("❌ ไม่พบข้อมูลกิจกรรม", ephemeral=True)
             return
@@ -59,22 +80,37 @@ class EventJoinView(discord.ui.View):
             return
 
         embed = interaction.message.embeds[0]
+
+        # Format user names for each status
+        going_names = format_names(event_data[message_id]["going"], interaction.guild)
+        maybe_names = format_names(event_data[message_id]["maybe"], interaction.guild)
+        declined_names = format_names(event_data[message_id]["declined"], interaction.guild)
+
+        # Update the embed fields with column layout
         embed.set_field_at(
             4,
-            name="📋 การเข้าร่วม",
-            value=(
-                f"👍 เข้าร่วม: {len(event_data[message_id]['going'])}\n"
-                f"❔ อาจจะมา: {len(event_data[message_id]['maybe'])}\n"
-                f"❌ ไม่มา: {len(event_data[message_id]['declined'])}"
-            ),
-            inline=False
+            name=f"✅ Accepted ({len(event_data[message_id]['going'])})",
+            value=going_names or "- ไม่มี -",
+            inline=True
+        )
+        embed.set_field_at(
+            5,
+            name=f"❔ Tentative ({len(event_data[message_id]['maybe'])})",
+            value=maybe_names or "- ไม่มี -",
+            inline=True
+        )
+        embed.set_field_at(
+            6,
+            name=f"❌ Declined ({len(event_data[message_id]['declined'])})",
+            value=declined_names or "- ไม่มี -",
+            inline=True
         )
 
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"📌 คุณตอบว่า: {button.label}", ephemeral=True)
 
     # Buttons for event responses
-    @discord.ui.button(label="✅ มาแน่นอน", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_response(interaction, "going", button)
 
@@ -86,15 +122,49 @@ class EventJoinView(discord.ui.View):
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_response(interaction, "declined", button)
 
+    # ฟังก์ชัน on_timeout สำหรับจัดการเมื่อ View หมดเวลา
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True  # ปิดการใช้งานปุ่มทั้งหมด
+        try:
+            await self.message.edit(content="⏳ เวลาหมดอายุสำหรับการตอบกลับ", view=self)
+        except discord.NotFound:
+            print("❌ ไม่สามารถแก้ไขข้อความได้ (ข้อความถูกลบไปแล้ว)")
+
+    # Button for editing the event
+    @discord.ui.button(label="✏️ แก้ไข", style=discord.ButtonStyle.blurple)
+    async def edit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.creator_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ คุณไม่มีสิทธิ์แก้ไขกิจกรรมนี้", ephemeral=True)
+            return
+
+        await interaction.response.send_message("📋 โปรดส่งข้อมูลใหม่สำหรับกิจกรรมนี้ (ยังไม่ได้เพิ่มฟังก์ชันแก้ไข)", ephemeral=True)
+
+    # Button for deleting the event
+    @discord.ui.button(label="🗑️ ลบ", style=discord.ButtonStyle.red)
+    async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.creator_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ คุณไม่มีสิทธิ์ลบกิจกรรมนี้", ephemeral=True)
+            return
+
+        # ลบข้อความและข้อมูลกิจกรรม
+        message_id = interaction.message.id
+        if message_id in event_data:
+            del event_data[message_id]
+
+        await interaction.message.delete()
+        await interaction.response.send_message("🗑️ กิจกรรมถูกลบเรียบร้อยแล้ว", ephemeral=True)
+
 #=============================================================================================
 # Command to create a new event
 @bot.tree.command(name="event", description="สร้างอีเวนต์ใหม่")
 @app_commands.describe(
     title="หัวข้ออีเวนต์",
-    editor_info="Editor by / Preset / Mod",
+    editor_info="Editor by / PresetMod",
     story="เนื้อเรื่องของภารกิจ",
     roles="บทบาทที่รับ (เช่น Rifleman, Sniper)",
-    time="เวลา (เช่น 11-04-2025 18:30)",
+    start_time="เวลาเริ่มต้น (เช่น 30-03-2568 21:00)",
+    end_time="เวลาสิ้นสุด (เช่น 30-03-2568 23:59)",
     channel="ห้องที่ต้องการโพสต์อีเวนต์",
     image_url="ลิงก์รูปภาพ (ไม่บังคับ)"
 )
@@ -104,32 +174,33 @@ async def create_event(
     editor_info: str,
     story: str,
     roles: str,
-    time: str,
+    start_time: str,
+    end_time: str,
     channel: discord.TextChannel,
     image_url: str = None
 ):
     try:
-        # ตรวจสอบสิทธิ์ของบอทในช่อง
-        if not channel.permissions_for(interaction.guild.me).send_messages:
-            await interaction.response.send_message(
-                f"❌ บอทไม่มีสิทธิ์ส่งข้อความในช่อง {channel.mention}", ephemeral=True
-            )
-            return
+        # แปลงเวลาเริ่มต้นและเวลาสิ้นสุด
+        start_time_dt = datetime.strptime(start_time, "%d-%m-%Y %H:%M")
+        end_time_dt = datetime.strptime(end_time, "%d-%m-%Y %H:%M")
+        start_time_utc = THAI_TZ.localize(start_time_dt).astimezone(pytz.utc)
+        end_time_utc = THAI_TZ.localize(end_time_dt).astimezone(pytz.utc)
 
-        event_time = datetime.strptime(time, "%d-%m-%Y %H:%M")
-        event_time = THAI_TZ.localize(event_time).astimezone(pytz.utc)
+        # จัดรูปแบบวันเวลา
+        formatted_time = format_event_time(start_time_utc, end_time_utc, THAI_TZ)
 
+        # สร้าง Embed
         embed = discord.Embed(title=title, color=discord.Color.green())
         embed.add_field(name="🛠️ Editor / Preset / Mod", value=editor_info, inline=False)
         embed.add_field(name="📖 Story", value=story, inline=False)
         embed.add_field(name="🎭 Roles", value=roles, inline=False)
-        embed.add_field(name="🕒 วันและเวลา", value=event_time.astimezone(THAI_TZ).strftime("%d-%m-%Y %H:%M น."), inline=False)
-        embed.add_field(name="📋 การเข้าร่วม", value="👍 เข้าร่วม: 0\n❔ อาจจะมา: 0\n❌ ไม่มา: 0", inline=False)
+        embed.add_field(name="🕒 วันและเวลา", value=formatted_time, inline=False)
+        embed.add_field(name="📋 การเข้าร่วม", value="✅ เข้าร่วม: 0\n❔ อาจจะมา: 0\n❌ ไม่มา: 0", inline=False)
 
         if image_url:
             embed.set_image(url=image_url)
 
-        view = EventJoinView(title, event_time)
+        view = EventJoinView(title, start_time_utc, interaction.user.id)
         msg = await channel.send(embed=embed, view=view)
 
         thread = await msg.create_thread(name=f"🗓️ {title}", auto_archive_duration=60)
@@ -137,7 +208,7 @@ async def create_event(
 
         event_data[msg.id] = {
             "title": title,
-            "event_time": event_time,
+            "event_time": start_time_utc,
             "going": [],
             "maybe": [],
             "declined": [],
@@ -148,32 +219,70 @@ async def create_event(
 
         await interaction.response.send_message("✅ กิจกรรมถูกสร้างเรียบร้อยแล้ว!", ephemeral=True)
 
-    except discord.Forbidden:
-        await interaction.response.send_message("❌ บอทไม่มีสิทธิ์ในช่องที่ระบุ", ephemeral=True)
     except ValueError:
         await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง! ใช้รูปแบบ: DD-MM-YYYY HH:MM", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ เกิดข้อผิดพลาด: {e}", ephemeral=True)
-
 #=============================================================================================
 #⚠️ /Help แสดงคำสั่งทั้งหมดของบอท
 @bot.tree.command(name="help", description="แสดงคำสั่งทั้งหมดของบอท")
 async def help_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="📜 รายการคำสั่งของบอท",
-        description="คำสั่งทั้งหมดที่สามารถใช้งานได้",
+        description="คำสั่งทั้งหมดที่สามารถใช้งานได้ในเซิร์ฟเวอร์นี้",
         color=discord.Color.blue()
     )
-    embed.add_field(name="/ping", value="ทดสอบว่าบอทออนไลน์หรือไม่", inline=False)
-    embed.add_field(name="/dm", value="ส่ง DM ให้กับสมาชิกที่อยู่ใน Role (เฉพาะแอดมิน)", inline=False)
-    embed.add_field(name="ถาม [ข้อความ]", value="ถามคำถามทั่วไปกับ AI", inline=False)
-    embed.set_footer(text="69Ranger Gentleman Community Bot")
+    embed.add_field(
+        name="⚙️ คำสั่งทั่วไป",
+        value=(
+            "`/ping` - ทดสอบว่าบอทออนไลน์หรือไม่\n"
+            "`/status` - แสดงสถานะของบอท\n"
+            "`/help` - แสดงคำสั่งทั้งหมดของบอท"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="📩 คำสั่งสำหรับแอดมิน",
+        value=(
+            "`/dm` - ส่งข้อความ DM ให้สมาชิกใน Role\n"
+            "`/event` - สร้างอีเวนต์ใหม่"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🎮 คำสั่งเกี่ยวกับกิจกรรม",
+        value=(
+            "`/event` - สร้างอีเวนต์ใหม่พร้อมปุ่มตอบรับ\n"
+            "สามารถใช้เพื่อจัดการกิจกรรมในเซิร์ฟเวอร์"
+        ),
+        inline=False
+    )
+    embed.set_footer(
+        text="69Ranger Gentleman Community Bot | พัฒนาโดย | Silver BlackWell", 
+        icon_url="https://cdn-icons-png.flaticon.com/512/847/847969.png"  # เพิ่มไอคอนใน Footer
+    )
+    embed.set_thumbnail(
+        url="https://cdn-icons-png.flaticon.com/512/847/847969.png"  # เพิ่มไอคอนใน Thumbnail
+    )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 #=============================================================================================
 #⚠️ /ping ทดสอบสถานะของบอท
 @bot.tree.command(name="ping", description="ทดสอบสถานะของบอท")
 async def slash_ping(interaction: discord.Interaction):
     await interaction.response.send_message("บอทยังทำงานอยู่ 🟢")
+#=============================================================================================
+#⚠️  /status เพื่อแสดงสถานะของบอท
+@bot.tree.command(name="status", description="แสดงสถานะของบอท")
+async def status_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📊 สถานะของบอท",
+        description="สถานะปัจจุบันของบอท",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="🟢 สถานะ", value="ออนไลน์", inline=False)
+    embed.add_field(name="📅 เวลาปัจจุบัน", value=datetime.now(THAI_TZ).strftime("%d-%m-%Y %H:%M:%S"), inline=False)
+    embed.set_footer(text="69Ranger Gentleman Community Bot")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 #=============================================================================================
 #⚠️ /DM ส่ง ข้อความ DM 
 class ConfirmView(discord.ui.View):
@@ -227,10 +336,15 @@ async def on_member_join(member):
     try:
         role = discord.utils.get(member.guild.roles, name="Civilian")
         if role:
-            await member.add_roles(role)
-            print(f"✅ ให้ Role '{role.name}' กับ {member.name} แล้ว")
+            if member.guild.me.guild_permissions.manage_roles:
+                await member.add_roles(role)
+                print(f"✅ ให้ Role '{role.name}' กับ {member.name} แล้ว")
+            else:
+                print("❌ บอทไม่มีสิทธิ์ในการจัดการ Role")
         else:
             print("❌ ไม่พบ Role 'Civilian'")
+    except discord.Forbidden:
+        print(f"❌ ไม่สามารถเพิ่ม Role ให้ {member.name} ได้ (ไม่มีสิทธิ์)")
 #=============================================================================================
 #⚠️ welcome_message DM
         welcome_message = (
