@@ -93,7 +93,8 @@ class EventJoinView(discord.ui.View):
         super().__init__(timeout=None)  # ตั้งค่า timeout=None เพื่อป้องกัน View หมดอายุ
         self.title = title
         self.event_time = event_time
-        self.creator_id = creator_id  # เพิ่มตัวแปรสำหรับเก็บ ID ของผู้สร้างกิจกรรม
+        self.creator_id = creator_id
+        print("📌 EventJoinView ถูกสร้างขึ้น")
 
     async def handle_response(self, interaction: discord.Interaction, status: str, button: discord.ui.Button):
         message_id = interaction.message.id
@@ -151,18 +152,19 @@ class EventJoinView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"📌 คุณตอบว่า: {button.label}", ephemeral=True)
     # Buttons for event responses
-    @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="✅ เข้าร่วม", style=discord.ButtonStyle.success, row=0)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         print("📌 Callback ถูกเรียกใช้งาน")
         await self.handle_response(interaction, "going", button)
 
-    @discord.ui.button(label="❔ อาจจะมา", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="❔ อาจจะมา", style=discord.ButtonStyle.primary, row=0)
     async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_response(interaction, "maybe", button)
 
-    @discord.ui.button(label="❌ ไม่มา", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="❌ ไม่มา", style=discord.ButtonStyle.danger, row=0)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_response(interaction, "declined", button)
+
 
     # ฟังก์ชัน on_timeout สำหรับจัดการเมื่อ View หมดเวลา
     async def on_timeout(self):
@@ -174,16 +176,14 @@ class EventJoinView(discord.ui.View):
             print("❌ ไม่สามารถแก้ไขข้อความได้ (ข้อความถูกลบไปแล้ว)")
 
     # Button for editing the event
-    @discord.ui.button(label="✏️ แก้ไข", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="✏️ แก้ไข", style=discord.ButtonStyle.blurple, row=1)
     async def edit(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.creator_id and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ คุณไม่มีสิทธิ์แก้ไขกิจกรรมนี้", ephemeral=True)
             return
-
         await interaction.response.send_message("📋 โปรดส่งข้อมูลใหม่สำหรับกิจกรรมนี้ (ยังไม่ได้เพิ่มฟังก์ชันแก้ไข)", ephemeral=True)
 
-    # Button for deleting the event
-    @discord.ui.button(label="🗑️ ลบ", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="🗑️ ลบ", style=discord.ButtonStyle.red, row=1)
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.creator_id and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ คุณไม่มีสิทธิ์ลบกิจกรรมนี้", ephemeral=True)
@@ -202,7 +202,7 @@ class EventJoinView(discord.ui.View):
 @bot.tree.command(name="event", description="สร้างอีเวนต์ใหม่")
 @app_commands.describe(
     title="หัวข้ออีเวนต์",
-    editor_info="Editor by / PresetMod",
+    editor_info="Editor by | PresetMod",
     story="เนื้อเรื่องของภารกิจ",
     roles="บทบาทที่รับ (75ranger)",
     start_time="เวลาเริ่มต้น (เช่น 30-03-2025 21:00)",
@@ -232,7 +232,7 @@ async def create_event(
         formatted_time = format_event_time(start_time_utc, end_time_utc, THAI_TZ)
 
         # สร้าง Embed
-        embed = discord.Embed(title=title.upper(), color=discord.Color.green())  # ใช้ .upper() เพื่อแปลง title เป็นตัวใหญ่
+        embed = discord.Embed(title=title.upper().replace("#", ""), color=discord.Color.green())  # ใช้ .upper() เพื่อแปลง title เป็นตัวใหญ่
         embed.add_field(name="🛠️ Editor | PresetMod", value=editor_info, inline=False)
         embed.add_field(name="📖 Story", value=story, inline=False)
         embed.add_field(name="⭐ Roles", value=roles, inline=False)
