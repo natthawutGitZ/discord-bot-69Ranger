@@ -48,7 +48,7 @@ def format_event_time(start_time: datetime, end_time: datetime, timezone: pytz.t
     now = datetime.now(timezone)
     if now < start_local:
         # เหลือเวลาอีก
-        time_diff = start_local - now
+        time_diff = start_local - now  
         if time_diff.days > 0:
             time_text = f"เหลือเวลาอีก {time_diff.days} วัน"
         else:
