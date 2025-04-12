@@ -158,7 +158,7 @@ class EventJoinView(discord.ui.View):
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         print("📌 Callback ถูกเรียกใช้งาน")
         try:
-            await interaction.response.send_message("📌 คุณตอบว่า: ✅ เข้าร่วม", ephemeral=True)
+            await self.handle_response(interaction, "going", button)
         except Exception as e:
             print(f"❌ เกิดข้อผิดพลาดใน Callback: {e}")
 
