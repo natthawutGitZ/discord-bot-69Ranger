@@ -10,6 +10,7 @@ def home():
 
 
 def run():
+    print("✅ Flask server is starting...")
     app.run(host='0.0.0.0', port=8080)
 
 
