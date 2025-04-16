@@ -16,22 +16,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-from babel.dates import format_datetime
-from datetime import datetime
-import pytz
 
-THAI_TZ = pytz.timezone("Asia/Bangkok")
-now = datetime.now(THAI_TZ)
-
-formatted_date = format_datetime(now, "EEEE d MMMM yyyy HH:mm", locale="th")
-print(formatted_date)
-
-import locale
-try:
-    locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")  # ตั้งค่าภาษาไทยสำหรับวันที่
-except locale.Error:
-    print("❌ Locale 'th_TH.UTF-8' is not supported. Falling back to default locale.")
-    locale.setlocale(locale.LC_TIME, "")  # ใช้ locale เริ่มต้นของระบบแทน
 
 #=============================================================================================
 #⚠️ /Help แสดงคำสั่งทั้งหมดของบอท
@@ -105,9 +90,9 @@ class ConfirmView(discord.ui.View):
             try:
                 await member.send(self.message)
                 success += 1
-            except:
+            except discord.Forbidden:
                 failed += 1
-            await asyncio.sleep(1)
+                print(f"❌ ไม่สามารถส่งข้อความให้ {member.name} ได้ (สมาชิกอาจปิดการรับ DM)")
 
         await interaction.followup.send(f"✅ ส่งสำเร็จ: {success} คน\n❌ ส่งไม่สำเร็จ: {failed} คน", ephemeral=True)
 
@@ -168,7 +153,7 @@ async def on_member_join(member):
             await channel.send(f"ยินดีต้อนรับ {member.mention}! โปรดเปิดการรับข้อความ DM เพื่อรับข้อมูลเพิ่มเติม.")
 
 #=============================================================================================
-#⚠️ status Arma 3 | 69RangerGTMCommunit
+
 @bot.event
 async def on_ready():
     print(f'✅ Logged in as {bot.user}')
@@ -183,5 +168,15 @@ async def on_ready():
         print(f"❌ เกิดข้อผิดพลาดในการซิงค์คำสั่ง: {e}")
 
 #=============================================================================================
+#⚠️ การจัดการข้อผิดพลาดทั่วไป
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้")
+    elif isinstance(error, commands.CommandNotFound):
+        await ctx.send("❌ ไม่พบคำสั่งนี้")
+    else:
+        await ctx.send("❌ เกิดข้อผิดพลาดบางอย่าง")
+        raise error
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))
