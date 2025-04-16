@@ -4,6 +4,7 @@ import os
 from keep_alive import keep_alive
 import asyncio
 import logging
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.DEBUG)
 
