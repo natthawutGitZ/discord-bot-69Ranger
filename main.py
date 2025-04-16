@@ -48,10 +48,10 @@ async def help_command(interaction: discord.Interaction):
     )
     embed.set_footer(
         text="69Ranger Gentleman Community Bot | พัฒนาโดย | Silver BlackWell", 
-        icon_url="https://cdn-icons-png.flaticon.com/512/847/847969.png"  # เพิ่มไอคอนใน Footer
+        icon_url="https://images-ext-1.discordapp.net/external/KHtLY8ldGkiHV5DbL-N3tB9Nynft4vdkfUMzQ5y2A_E/https/cdn.discordapp.com/avatars/1290696706605842482/df2732e4e949bcb179aa6870f160c615.png?format=webp&quality=lossless&width=102&height=102"  # เพิ่มไอคอนใน Footer
     )
     embed.set_thumbnail(
-        url="https://cdn-icons-png.flaticon.com/512/847/847969.png"  # เพิ่มไอคอนใน Thumbnail
+        url="https://images-ext-1.discordapp.net/external/KHtLY8ldGkiHV5DbL-N3tB9Nynft4vdkfUMzQ5y2A_E/https/cdn.discordapp.com/avatars/1290696706605842482/df2732e4e949bcb179aa6870f160c615.png?format=webp&quality=lossless&width=102&height=102"  # เพิ่มไอคอนใน Thumbnail
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
