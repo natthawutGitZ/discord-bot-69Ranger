@@ -1,5 +1,6 @@
 discord.py==2.3.2
-openai>=1.0.0
 pytz
 babel
 flask
+python-dotenv
+pynacl
