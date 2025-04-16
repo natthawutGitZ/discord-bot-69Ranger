@@ -16,6 +16,9 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# กำหนดเขตเวลาไทย
+import pytz  
+THAI_TZ = pytz.timezone("Asia/Bangkok")
 
 
 #=============================================================================================
