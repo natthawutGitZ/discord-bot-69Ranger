@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.DEBUG)
 
+# โหลดตัวแปรจาก .env
+load_dotenv()
+
 # Initialize bot and intents
 intents = discord.Intents.default()
 intents.message_content = True
@@ -23,8 +26,8 @@ async def on_ready():
         activity=discord.Game(name="Arma 3 | 69RangerGTMCommunit")
     )
     try:
-        await bot.tree.sync()
-        print("✅ ซิงค์คำสั่งเรียบร้อยแล้ว")
+        synced = await bot.tree.sync()
+        print(f"✅ ซิงค์คำสั่ง {len(synced)} คำสั่งเรียบร้อยแล้ว")
     except Exception as e:
         print(f"❌ เกิดข้อผิดพลาดในการซิงค์คำสั่ง: {e}")
 
@@ -32,7 +35,11 @@ async def main():
     async with bot:
         # โหลด Cogs
         for cog in ["general", "admin", "events", "auto_role"]:
-            await bot.load_extension(f"cogs.{cog}")
+            try:
+                await bot.load_extension(f"cogs.{cog}")
+                print(f"✅ โหลด Cog {cog} สำเร็จ")
+            except Exception as e:
+                print(f"❌ เกิดข้อผิดพลาดในการโหลด Cog {cog}: {e}")
         keep_alive()
         await bot.start(os.getenv("DISCORD_TOKEN"))
 
